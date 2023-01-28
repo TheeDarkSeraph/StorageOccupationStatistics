@@ -7,7 +7,45 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace StorageOccupationStatistics {
-    internal class HelperFunctions {
+    public class HelperFunctions {
+
+        public static Color LerpColor(Color start, Color end, float lerpValue, float lerpStart, float lerpEnd) {
+            if (lerpValue > lerpEnd)
+                return end;
+            if (lerpValue < lerpStart)
+                return start;
+            float lerpRatio = (lerpValue - lerpStart) / (lerpEnd - lerpStart);
+            return Color.FromArgb(
+                (int)(start.A + (end.A - start.A) * lerpRatio + 0.5f),
+                (int)(start.R + (end.R - start.R) * lerpRatio + 0.5f),
+                (int)(start.G + (end.G - start.G) * lerpRatio + 0.5f),
+                (int)(start.B + (end.B - start.B) * lerpRatio + 0.5f)
+            );
+        }
+
+        public static Color Lerp3Color(Color start, Color middle, Color end, float lerpValue, float lerpStart, float lerpEnd) {
+            if (lerpValue > lerpEnd)
+                return end;
+            if (lerpValue < lerpStart)
+                return start;
+            float lerpRatio = (lerpValue - lerpStart) / (lerpEnd - lerpStart);
+            if (lerpRatio < 0.5) {
+                lerpRatio *= 2; //range becomes 0 to 0.5
+                end = middle;
+            } else {
+                start = middle;
+                lerpRatio -= 0.5f;
+                lerpRatio *= 2;
+
+            }
+            
+            return Color.FromArgb(
+                (int)(start.A + (end.A - start.A) * lerpRatio + 0.5f),
+                (int)(start.R + (end.R - start.R) * lerpRatio + 0.5f),
+                (int)(start.G + (end.G - start.G) * lerpRatio + 0.5f),
+                (int)(start.B + (end.B - start.B) * lerpRatio + 0.5f)
+            );
+        }
         public static Bitmap ResizeImage(Image image, int width, int height) {
             var destRect = new Rectangle(0, 0, width, height);
             var destImage = new Bitmap(width, height);

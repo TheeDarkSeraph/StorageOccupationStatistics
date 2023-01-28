@@ -13,30 +13,33 @@ namespace StorageOccupationStatistics {
     // Done: fix the instant refresh after adding a new control
     // IMPORTANT ^^^^^^^^^^^^^^^^^^^^^^^^
 
-    // TODO: Find another solution other than using the global instance variable for the tree (maybe just assign it to some kind of variable).
+    // Done: Find another solution other than using the global instance variable for the tree (maybe just assign it to some kind of variable).
 
+    // TODO: Add a choose your path
+    // TODO: Add a loading screen or something...?
 
-
-    // TODO: before we make the ratio of the children and such, we need to apply the progress UI first
+    // Done: before we make the ratio of the children and such, we need to apply the progress UI first
     //          So we figure out how to make this progress UI then we figure out how to fill it.
+
+    // TODO: associate the parent node ratio to be relative to drive's taken size
 
     // TODO: selection highlight of whole row (is it a label highlight? or what should it be?)
     //          Can a label pass through commands to things under it like the expansion button?
 
-    // TODO: associate file ratio of children with each other.
+    // Done: associate file ratio of children with each other.
     // max file size = min (max,1)
     // Ratio = fileSize / max filsize  (to avoid zero division)
     // TODO: Can we make this code cleaner?
 
     public class FileInfoNode {
-        public static readonly int UiHeight = 20, UiIndent = 16, BtnWidth = 20,
-            BarLabelWidth = 40, TotalUiWidth = 400, InterYSpace = 4, StartX = 4;
-        private int _myIndent = 0;
+        public static readonly int UiHeight = 20, UiIndent = 16, BtnWidth = 20, ProgressInterX=4,
+            ProgressLabelWidth = 44, TotalUiWidth = 400, InterYSpace = 4, StartX = 4;
+        private int _myIndent;
         private readonly List<FileInfoNode> _innerFileNodes = new();
         private readonly FileInfo _nodeFile;
         private FileInfoNode? _parentNode;
         private static readonly Image ExpandedImage, CollapsedImage;
-        private bool _isExpanded = false;
+        private bool _isExpanded;
         private long _fileSize;
         private readonly List<Control> _nodeUi = new ();
         static FileInfoNode() {
@@ -55,6 +58,10 @@ namespace StorageOccupationStatistics {
         {
             string name = _nodeFile.Name;
             return name.Trim() == string.Empty ? new DirectoryInfo(_nodeFile.FullName).Name : _nodeFile.Name;
+        }
+
+        public string? GetFilePath() {
+            return _nodeFile.FullName;
         }
         public List<FileInfoNode> GetInnerFiles(FileInfo directory) {
             string[] innerFiles = GetFilesAndDirectories(directory);
@@ -103,22 +110,6 @@ namespace StorageOccupationStatistics {
         }
 #pragma warning restore CS0168 // The variable 'e' is declared but never used
 
-        public long GetFileSize() {
-            return _fileSize;
-        }
-
-        public void CalculateSize() {
-            // the inner most nodes will get their size, and pass them upwards in the constructor
-            // this will make each node calculated before hand and no need for duplicate
-            // recursions happening
-
-            _fileSize = (_nodeFile.Attributes & FileAttributes.Directory) != 0 ? GetSumOfChildFilesSize() :
-                // Not a directory
-                _nodeFile.Length;
-        }
-        private long GetSumOfChildFilesSize() {
-            return _innerFileNodes.Sum(fileNode => fileNode.GetFileSize());
-        }
         public int GetAllFileCount(bool countFiles, bool countFolders) {
             if (_nodeFile.Attributes.HasFlag(FileAttributes.System) && _nodeFile.Attributes.HasFlag(FileAttributes.Hidden)) {
                 //Debug.WriteLine("System "+_nodeFile.FullName);
@@ -144,38 +135,8 @@ namespace StorageOccupationStatistics {
             }
             return sum;
         }
-        public void PrintInnerInfo() {
-            long totalSize = 0, totalFiles = 0, totalFolders = 0;
-            foreach (FileInfoNode fileNode in _innerFileNodes) {
-                Debug.WriteLine(fileNode._nodeFile.FullName);
-                long t1 = fileNode.GetFileSize();
-                long t2 = fileNode.GetAllFileCount(true, false);
-                long t3 = fileNode.GetAllFileCount(false, true);
-                Debug.WriteLine(t1 + " " + (t1 / (1024 * 1024 * 1024)));
-                Debug.WriteLine("Files : " + t2);
-                Debug.WriteLine("Folders : " + t3);
-                totalSize += t1;
-                totalFiles += t2;
-                totalFolders += t3;
-            }
-            Debug.WriteLine("All:");
-            Debug.WriteLine(totalSize);
-            Debug.WriteLine("Files : " + totalFiles);
-            Debug.WriteLine("Folders : " + totalFolders);
-        }
 
-        //public void Expand() {
-        //    isExpanded = true;
-        //}
-        //public void ExpandChildren() {
-        //    foreach (FileInfoNode nodeInfo in _innerFileNodes) {
-        //        nodeInfo.Expand();
-        //    }
-        //}
-        //public void Collapse() {
-        //    isExpanded = false;
-        //}
-
+#region Add UI Components
         private void AddUiComponents(Panel panel, int indentLevel, ref int previousY) {
             _myIndent = indentLevel;
             int uiXLocation = StartX + indentLevel * UiIndent;
@@ -184,17 +145,15 @@ namespace StorageOccupationStatistics {
             }
             uiXLocation += BtnWidth;
             //Image for image refs And on click listener
-            _nodeUi.Add(new Label() {
-                BackColor = Color.Green,
-                Bounds = new Rectangle(uiXLocation, previousY - panel.VerticalScroll.Value, BarLabelWidth, UiHeight)
-            });
-            uiXLocation += BarLabelWidth;
+            AddProgressLabel(panel, previousY, uiXLocation);
+            uiXLocation += ProgressLabelWidth+ProgressInterX;
             _nodeUi.Add(new Label() {
                 BackColor = Color.Bisque,
                 Text = GetFileName(),
                 Bounds = new Rectangle(uiXLocation, previousY - panel.VerticalScroll.Value, TotalUiWidth - uiXLocation, UiHeight)
             });
         }
+
 
         private void AddCollapseButton(Panel panel, int previousY, int uiXLocation) {
             Button btn = CreateCollapseButton(panel, previousY, uiXLocation);
@@ -213,6 +172,102 @@ namespace StorageOccupationStatistics {
             btn.FlatAppearance.MouseOverBackColor = btn.BackColor;
             btn.Click += ChangeCollapseEvent;
             return btn;
+        }
+
+        private void AddProgressLabel(Panel panel, int previousY, int uiXLocation) {
+            int adjustBorderRadius = (int)(UiHeight * 0.5f);
+            int heightAdjustment = 6;
+            RoundProgressLabel rpLabel = new RoundProgressLabel() {
+                Bounds = new Rectangle(uiXLocation, 
+                    previousY - panel.VerticalScroll.Value + heightAdjustment / 2,
+                    ProgressLabelWidth, UiHeight - heightAdjustment),
+                FillRatio = GetSizeRatio(),
+                BorderRadius = adjustBorderRadius,
+                //BorderSize = 2
+            };
+            _nodeUi.Add(rpLabel);
+        }
+        private long GetTotalFreeSpace(string driveName) {
+            foreach (DriveInfo drive in DriveInfo.GetDrives()) {
+                if (drive.IsReady && drive.Name == driveName) {
+                    return drive.TotalFreeSpace; // avail takes into account quota's for each account
+                }
+            }
+            return -1;
+        }
+        private long GetTotalSpace(string driveName) {
+            foreach (DriveInfo drive in DriveInfo.GetDrives()) {
+                if (drive.IsReady && drive.Name == driveName) {
+                    return drive.TotalSize; // avail takes into account quota's for each account
+                }
+            }
+            return -1;
+        }
+
+        private float GetSizeRatio() {
+            if (_parentNode == null){
+
+                Debug.WriteLine("is root? " + GetFilePath());
+                Debug.WriteLine("is root2? " + Path.GetPathRoot(GetFilePath()));
+
+                string rootPath = Path.GetPathRoot(GetFilePath());
+                if (rootPath != null) {
+                    long freeSpace = GetTotalFreeSpace(rootPath);
+                    long totalSpace = GetTotalSpace(rootPath);
+                    long takenSpace = totalSpace - freeSpace;
+                    if (rootPath == GetFilePath()) {
+                        Debug.WriteLine("Root satisfied");
+                        return (float)(takenSpace / ((double)totalSpace));
+                    } else {
+                        return (float)(GetFileSize() / (double)takenSpace);
+                    }
+                } else {
+                    return 1;
+                }
+            } else {
+                long parentSize = Math.Max(_parentNode.GetFileSize(), 1);
+                return (float)(GetFileSize() / ((double)parentSize));
+            }
+        }
+
+        public long GetFileSize() {
+            return _fileSize;
+        }
+
+        public void CalculateSize() {
+            // the inner most nodes will get their size, and pass them upwards in the constructor
+            // this will make each node calculated before hand and no need for duplicate
+            // recursions happening
+
+            _fileSize = (_nodeFile.Attributes & FileAttributes.Directory) != 0 ? GetSumOfChildFilesSize() :
+                // Not a directory
+                _nodeFile.Length;
+        }
+        private long GetSumOfChildFilesSize() {
+            return _innerFileNodes.Sum(fileNode => fileNode.GetFileSize());
+        }
+#endregion
+
+
+
+        public void PrintInnerInfo() {
+            long totalSize = 0, totalFiles = 0, totalFolders = 0;
+            foreach (FileInfoNode fileNode in _innerFileNodes) {
+                Debug.WriteLine(fileNode._nodeFile.FullName);
+                long t1 = fileNode.GetFileSize();
+                long t2 = fileNode.GetAllFileCount(true, false);
+                long t3 = fileNode.GetAllFileCount(false, true);
+                Debug.WriteLine(t1 + " " + (t1 / (1024 * 1024 * 1024)));
+                Debug.WriteLine("Files : " + t2);
+                Debug.WriteLine("Folders : " + t3);
+                totalSize += t1;
+                totalFiles += t2;
+                totalFolders += t3;
+            }
+            Debug.WriteLine("All:");
+            Debug.WriteLine(totalSize);
+            Debug.WriteLine("Files : " + totalFiles);
+            Debug.WriteLine("Folders : " + totalFolders);
         }
 
         private void ChangeCollapseEvent(object? sender, EventArgs e) {
