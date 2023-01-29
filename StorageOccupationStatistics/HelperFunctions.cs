@@ -9,6 +9,14 @@ using System.Threading.Tasks;
 namespace StorageOccupationStatistics {
     public class HelperFunctions {
 
+        public static void PausePanel(Panel panel) {
+            panel.SuspendLayout();
+            DrawingControl.SuspendDrawing(panel);
+        }
+        public static void ResumePanel(Panel panel) {
+            DrawingControl.ResumeDrawing(panel);
+            panel.ResumeLayout();
+        }
         public static Color LerpColor(Color start, Color end, float lerpValue, float lerpStart, float lerpEnd) {
             if (lerpValue > lerpEnd)
                 return end;

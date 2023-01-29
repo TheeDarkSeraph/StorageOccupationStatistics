@@ -32,25 +32,18 @@ namespace StorageOccupationStatistics {
     // TODO: Can we make this code cleaner?
 
     public class FileInfoNode {
-        public static readonly int UiHeight = 20, UiIndent = 16, BtnWidth = 20, ProgressInterX=4,
-            ProgressLabelWidth = 44, TotalUiWidth = 400, InterYSpace = 4, StartX = 4;
-        private int _myIndent;
-        private readonly List<FileInfoNode> _innerFileNodes = new();
+        public List<FileInfoNode> InnerFileNodes { get; private set; } = new();
         private readonly FileInfo _nodeFile;
-        private FileInfoNode? _parentNode;
-        private static readonly Image ExpandedImage, CollapsedImage;
-        private bool _isExpanded;
+        public FileInfoNode? ParentNode;
+        private FileNodeUi _nodeUi;
         private long _fileSize;
-        private readonly List<Control> _nodeUi = new ();
-        static FileInfoNode() {
-            ExpandedImage = HelperFunctions.ResizeImage(Resource1.tr_d, UiHeight - 2, UiHeight - 2);
-            CollapsedImage = HelperFunctions.ResizeImage(Resource1.tr_r, UiHeight - 2, UiHeight - 2);
-        }
+        
         public FileInfoNode(FileInfo file) {
-            _parentNode = null;
+            ParentNode = null;
             _nodeFile = file;
+            _nodeUi = new(this);
             if ((file.Attributes & FileAttributes.Directory) != 0) {
-                _innerFileNodes = GetInnerFiles(file);
+                SetupInnerFiles(file);
             }
             CalculateSize();
         }
@@ -63,13 +56,12 @@ namespace StorageOccupationStatistics {
         public string? GetFilePath() {
             return _nodeFile.FullName;
         }
-        public List<FileInfoNode> GetInnerFiles(FileInfo directory) {
+        public void SetupInnerFiles(FileInfo directory) {
             string[] innerFiles = GetFilesAndDirectories(directory);
-            List<FileInfoNode> innerNodes = new List<FileInfoNode>(innerFiles.Length);
+            InnerFileNodes = new List<FileInfoNode>(innerFiles.Length);
             foreach (string fileName in innerFiles) {
-                AddFileNode(innerNodes, new FileInfo(fileName));
+                AddFileNode(InnerFileNodes, new FileInfo(fileName));
             }
-            return innerNodes;
         }
         private void AddFileNode(List<FileInfoNode> nodeList, FileInfo fileInfo) {
             if (fileInfo.Attributes.HasFlag(FileAttributes.ReparsePoint)) {
@@ -81,8 +73,14 @@ namespace StorageOccupationStatistics {
 
         }
         public void SetParentNode(FileInfoNode node) {
-            _parentNode = node;
+            ParentNode = node;
         }
+
+        public FileNodeUi? GetParentNodeUi() {
+            return ParentNode?._nodeUi;
+        }
+
+        #region Getters
 
 #pragma warning disable CS0168 // The variable 'e' is declared but never used
         private string[] GetFilesAndDirectories(FileInfo dirName) {
@@ -130,63 +128,12 @@ namespace StorageOccupationStatistics {
         }
         public int GetChildFoldersCount(bool countFiles, bool countFolders) {
             int sum = 0;
-            foreach (FileInfoNode fileNode in _innerFileNodes) {
+            foreach (FileInfoNode fileNode in InnerFileNodes) {
                 sum += fileNode.GetAllFileCount(countFiles, countFolders);
             }
             return sum;
         }
 
-#region Add UI Components
-        private void AddUiComponents(Panel panel, int indentLevel, ref int previousY) {
-            _myIndent = indentLevel;
-            int uiXLocation = StartX + indentLevel * UiIndent;
-            if (_innerFileNodes.Count > 0) {
-                AddCollapseButton(panel, previousY, uiXLocation);
-            }
-            uiXLocation += BtnWidth;
-            //Image for image refs And on click listener
-            AddProgressLabel(panel, previousY, uiXLocation);
-            uiXLocation += ProgressLabelWidth+ProgressInterX;
-            _nodeUi.Add(new Label() {
-                BackColor = Color.Bisque,
-                Text = GetFileName(),
-                Bounds = new Rectangle(uiXLocation, previousY - panel.VerticalScroll.Value, TotalUiWidth - uiXLocation, UiHeight)
-            });
-        }
-
-
-        private void AddCollapseButton(Panel panel, int previousY, int uiXLocation) {
-            Button btn = CreateCollapseButton(panel, previousY, uiXLocation);
-            _nodeUi.Add(btn);
-        }
-
-        private Button CreateCollapseButton(Panel panel, int previousY, int uiXLocation) {
-            Button btn = new() {
-                BackColor = Color.Transparent,
-                Bounds = new Rectangle(uiXLocation, previousY - panel.VerticalScroll.Value, BtnWidth, UiHeight),
-                Image = (_isExpanded ? ExpandedImage : CollapsedImage),
-                FlatStyle = FlatStyle.Flat
-            };
-            btn.FlatAppearance.BorderSize = 0;
-            btn.FlatAppearance.MouseDownBackColor = btn.BackColor;
-            btn.FlatAppearance.MouseOverBackColor = btn.BackColor;
-            btn.Click += ChangeCollapseEvent;
-            return btn;
-        }
-
-        private void AddProgressLabel(Panel panel, int previousY, int uiXLocation) {
-            int adjustBorderRadius = (int)(UiHeight * 0.5f);
-            int heightAdjustment = 6;
-            RoundProgressLabel rpLabel = new RoundProgressLabel() {
-                Bounds = new Rectangle(uiXLocation, 
-                    previousY - panel.VerticalScroll.Value + heightAdjustment / 2,
-                    ProgressLabelWidth, UiHeight - heightAdjustment),
-                FillRatio = GetSizeRatio(),
-                BorderRadius = adjustBorderRadius,
-                //BorderSize = 2
-            };
-            _nodeUi.Add(rpLabel);
-        }
         private long GetTotalFreeSpace(string driveName) {
             foreach (DriveInfo drive in DriveInfo.GetDrives()) {
                 if (drive.IsReady && drive.Name == driveName) {
@@ -204,19 +151,19 @@ namespace StorageOccupationStatistics {
             return -1;
         }
 
-        private float GetSizeRatio() {
-            if (_parentNode == null){
+        public bool HasSubfiles() {
+            return InnerFileNodes.Count > 0;
+        }
 
-                Debug.WriteLine("is root? " + GetFilePath());
-                Debug.WriteLine("is root2? " + Path.GetPathRoot(GetFilePath()));
 
+        public float GetSizeRatio() {
+            if (ParentNode == null){
                 string rootPath = Path.GetPathRoot(GetFilePath());
                 if (rootPath != null) {
                     long freeSpace = GetTotalFreeSpace(rootPath);
                     long totalSpace = GetTotalSpace(rootPath);
                     long takenSpace = totalSpace - freeSpace;
                     if (rootPath == GetFilePath()) {
-                        Debug.WriteLine("Root satisfied");
                         return (float)(takenSpace / ((double)totalSpace));
                     } else {
                         return (float)(GetFileSize() / (double)takenSpace);
@@ -225,7 +172,7 @@ namespace StorageOccupationStatistics {
                     return 1;
                 }
             } else {
-                long parentSize = Math.Max(_parentNode.GetFileSize(), 1);
+                long parentSize = Math.Max(ParentNode.GetFileSize(), 1);
                 return (float)(GetFileSize() / ((double)parentSize));
             }
         }
@@ -235,24 +182,20 @@ namespace StorageOccupationStatistics {
         }
 
         public void CalculateSize() {
-            // the inner most nodes will get their size, and pass them upwards in the constructor
-            // this will make each node calculated before hand and no need for duplicate
-            // recursions happening
-
             _fileSize = (_nodeFile.Attributes & FileAttributes.Directory) != 0 ? GetSumOfChildFilesSize() :
                 // Not a directory
                 _nodeFile.Length;
         }
         private long GetSumOfChildFilesSize() {
-            return _innerFileNodes.Sum(fileNode => fileNode.GetFileSize());
+            return InnerFileNodes.Sum(fileNode => fileNode.GetFileSize());
         }
-#endregion
+        #endregion
 
 
 
         public void PrintInnerInfo() {
             long totalSize = 0, totalFiles = 0, totalFolders = 0;
-            foreach (FileInfoNode fileNode in _innerFileNodes) {
+            foreach (FileInfoNode fileNode in InnerFileNodes) {
                 Debug.WriteLine(fileNode._nodeFile.FullName);
                 long t1 = fileNode.GetFileSize();
                 long t2 = fileNode.GetAllFileCount(true, false);
@@ -270,111 +213,27 @@ namespace StorageOccupationStatistics {
             Debug.WriteLine("Folders : " + totalFolders);
         }
 
-        private void ChangeCollapseEvent(object? sender, EventArgs e) {
-            ChangeCollapse();
-        }
-        public void ChangeCollapse() {
-            // tabstop = true
-            Panel panel = (Panel)_nodeUi[0].Parent;
-            panel.SuspendLayout();
-            DrawingControl.SuspendDrawing(panel);
-            //panel.SuspendLayout();
-            int p = panel.VerticalScroll.Value;
-            _isExpanded = !_isExpanded;
-            if (_isExpanded) {
-                Rectangle rect = _nodeUi[^1].Bounds; // anyone will work
-                
-                // for some reason, this works...
-                int previousY = rect.Y + panel.VerticalScroll.Value;
-                if (_innerFileNodes.Count > 0) ((Button)_nodeUi[0]).Image = ExpandedImage;
-                ClearMyUi(panel);
-                //Debug.WriteLine("my indent " + _myIndent);
-                DrawSelf(panel, _myIndent, ref previousY);
-                if (_parentNode != null) {
-                    previousY -= panel.VerticalScroll.Value;
-                    _parentNode.UpdateNeighborPositions(panel,this, previousY);
-                }
-            } else {
-                ClearChildrenUi(panel); // here
-                if (_innerFileNodes.Count > 0) ((Button)_nodeUi[0]).Image = CollapsedImage;
-                if (_parentNode != null) {
-                    Rectangle rect = _nodeUi[^1].Bounds; // anyone will work
-                    // for some reason, this is the one with the problem..?
-                    int previousY = rect.Y + UiHeight + InterYSpace;
-                    _parentNode.UpdateNeighborPositions(panel,this, previousY);
-                    //_parentNode
-                }
-            }
-
-            //_nodeUi[0].Select();//  Select();
-            panel.VerticalScroll.Value = Math.Min(p, panel.VerticalScroll.Maximum);
-            DrawingControl.ResumeDrawing(panel);
-            panel.ResumeLayout();
-
-            panel.PerformLayout();
-            // redraw UI, this will require us knowing the parent
+        public int GetIndexInParent() {
+            return ParentNode!.InnerFileNodes.IndexOf(this);
         }
 
-        //public void DrawSelfWithSuspend(Panel panel, int indentLevel, ref int previousY) {
-        //    panel.SuspendLayout();
-        //    DrawSelf(panel, indentLevel, ref previousY);
-        //    panel.ResumeLayout();
-        //}
-        public void DrawSelf(Panel panel, int indentLevel, ref int previousY) {
-            AddUiComponents(panel, indentLevel, ref previousY);
-            foreach (Control uiUnit in _nodeUi) {
-                panel.Controls.Add(uiUnit);
-                //FileInfoTree.addedUI.Add(uiUnit);
-            }
-            previousY += UiHeight + InterYSpace;
-            if (!_isExpanded) return;
-            foreach (FileInfoNode nodeInfo in _innerFileNodes) {
-                nodeInfo.DrawSelf(panel, indentLevel + 1, ref previousY);
-            }
+        public void DrawUi(Panel panel, int startXIndent, ref int startPrev) {
+            _nodeUi.DrawSelf(panel, startXIndent, ref startPrev);
+        }
+
+        public void ReadjustUi(Panel panel, int indentLevel, ref int previousY) {
+            _nodeUi.ReadjustUiPositions(panel, indentLevel, ref previousY);
         }
         public void ClearSelfAndChildrenUi(Panel panel) {
-            ClearMyUi(panel);
+            _nodeUi.ClearUi(panel);
             ClearChildrenUi(panel);
         }
-        private void ClearMyUi(Panel panel) {
-            foreach (Control uiUnit in _nodeUi) {
-                panel.Controls.Remove(uiUnit);
-                //FileInfoTree.addedUI.Remove(uiUnit);
-            }
-            _nodeUi.Clear();
-        }
-        private void ClearChildrenUi(Panel panel) {
-            foreach (FileInfoNode nodeInfo in _innerFileNodes) {
+
+        public void ClearChildrenUi(Panel panel) {
+            foreach (FileInfoNode nodeInfo in InnerFileNodes) {
                 nodeInfo.ClearSelfAndChildrenUi(panel);
             }
         }
-        // the caller of this should suspend
-        private void UpdateNeighborPositions(Panel panel, FileInfoNode startNode, int previousY) {
-            int startIndex = _innerFileNodes.IndexOf(startNode);
-            for (int i = startIndex + 1; i < _innerFileNodes.Count; i++) {
-                _innerFileNodes[i].ReadjustSelf(panel, _myIndent + 1, ref previousY);
-            }
-            _parentNode?.UpdateNeighborPositions(panel, this, previousY);
-        }
-
-        public void ReadjustSelf(Panel panel, int indentLevel, ref int previousY) {
-            UpdateUi(indentLevel, ref previousY);
-            previousY += UiHeight + InterYSpace;
-
-            if (!_isExpanded) return;
-            foreach (FileInfoNode nodeInfo in _innerFileNodes) {
-                nodeInfo.ReadjustSelf(panel, indentLevel + 1, ref previousY);
-            }
-        }
-        private void UpdateUi(int indentLevel, ref int previousY) {
-            _myIndent = indentLevel;
-            foreach (Control ctrl in _nodeUi) {
-                Rectangle rect = ctrl.Bounds;
-                rect.Y = previousY;
-                ctrl.Bounds = rect;
-            }
-        }
-
         // I think this is a failure
         // pass a path, the tree should call this somehow
         public void SaveInFile() {

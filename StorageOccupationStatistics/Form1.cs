@@ -12,9 +12,9 @@ namespace StorageOccupationStatistics {
         public Form1() {
             InitializeComponent();
             filePanel.AutoScroll = true;
-            //FileInfoTree fit = new FileInfoTree("C:\\Program Files\\Adobe", filePanel);
+            FileInfoTree fit = new FileInfoTree("C:\\Program Files\\Adobe", filePanel);
             //FileInfoTree fit = new FileInfoTree("D:", filePanel);
-            FileInfoTree fit = new FileInfoTree("C:\\Program Files\\", filePanel);
+            //FileInfoTree fit = new FileInfoTree("C:\\Program Files\\", filePanel);
             //fit.GetRoot().Expand();
             //fit.GetRoot().ExpandChildren();
             
