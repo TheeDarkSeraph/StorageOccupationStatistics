@@ -12,12 +12,13 @@ namespace StorageOccupationStatistics {
         public Form1() {
             InitializeComponent();
             filePanel.AutoScroll = true;
-            FileInfoTree fit = new FileInfoTree("C:\\Program Files\\Adobe", filePanel);
+            //FileInfoTree fit = new FileInfoTree("C:\\Program Files\\Adobe", filePanel);
             //FileInfoTree fit = new FileInfoTree("D:", filePanel);
             //FileInfoTree fit = new FileInfoTree("C:\\Program Files\\", filePanel);
+            FileInfoTree fit = new FileInfoTree("C:\\", filePanel);
             //fit.GetRoot().Expand();
             //fit.GetRoot().ExpandChildren();
-            
+
         }
         // what about C# table with the first column having button and label?
 

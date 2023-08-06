@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 namespace StorageOccupationStatistics {
     public class HelperFunctions {
 
+        public static int VerticalScrollValueOf(Panel panel) {
+            return panel.VerticalScroll.Value;
+        }
         public static void PausePanel(Panel panel) {
             panel.SuspendLayout();
             DrawingControl.SuspendDrawing(panel);

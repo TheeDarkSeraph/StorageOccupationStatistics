@@ -27,11 +27,16 @@ namespace StorageOccupationStatistics {
             _fileInfoNode = fin;
         }
 
+        public int GetNodeYLocation() {
+            if (_uiControls.Count > 0) {
 
+            }
+            return -1;
+        }
         public void ChangeCollapse() {
             Panel panel = (Panel)_uiControls[0].Parent;
             HelperFunctions.PausePanel(panel);
-            int scrollValue = GetVerticalScrollValue(panel);
+            int scrollValue = HelperFunctions.VerticalScrollValueOf(panel);
             _isExpanded = !_isExpanded;
             if (_isExpanded) {
                 DrawUiAsExpanded(panel);
@@ -43,28 +48,29 @@ namespace StorageOccupationStatistics {
             panel.PerformLayout();
         }
 
-        private static int GetVerticalScrollValue(Panel panel) {
-            return panel.VerticalScroll.Value;
-        }
 
         private static void ReturnPanelToSavedVerticalScrollValue(Panel panel, int p) {
             panel.VerticalScroll.Value = Math.Min(p, panel.VerticalScroll.Maximum);
         }
 
-
-        
-
-
         private void DrawUiAsExpanded(Panel panel) {
             Rectangle rect = _uiControls[^1].Bounds; // anyone will work
             // for some reason, this works...
-            int previousY = rect.Y + panel.VerticalScroll.Value;
+            int previousY = rect.Y + HelperFunctions.VerticalScrollValueOf(panel);
             if (_fileInfoNode.HasSubfiles()) ((Button)_uiControls[0]).Image = ExpandedImage;
             ClearUi(panel);
+            //Debug.WriteLine("part0 " + previousY);
+
             DrawSelf(panel, _myIndent, ref previousY);
+
             if (_fileInfoNode.ParentNode == null) return;
-            previousY -= panel.VerticalScroll.Value;
+            //Debug.WriteLine("part1 "+previousY);
+            previousY -= HelperFunctions.VerticalScrollValueOf(panel);
+            //Debug.WriteLine("part2 " + previousY);
+
             _fileInfoNode.GetParentNodeUi()?.UpdateNeighborPositions(panel, _fileInfoNode, previousY);
+            //Debug.WriteLine("part3 " + previousY);
+
         }
         private void DrawUiAsCollapsed(Panel panel) {
             _fileInfoNode.ClearChildrenUi(panel); // here
@@ -102,7 +108,7 @@ namespace StorageOccupationStatistics {
 
         private void SetupUiControls(Panel panel, int indentLevel, ref int previousY) {
             _myIndent = indentLevel;
-            previousY -= panel.VerticalScroll.Value;
+            previousY -= HelperFunctions.VerticalScrollValueOf(panel);
             int uiXLocation = StartX + indentLevel * UiIndent;
             if (_fileInfoNode.HasSubfiles()) 
                 AddCollapseButton(panel, previousY, uiXLocation);
@@ -110,6 +116,7 @@ namespace StorageOccupationStatistics {
             AddProgressLabel(panel, previousY, uiXLocation);
             uiXLocation += ProgressLabelWidth + ProgressInterX;
             AddFilenameLabel(previousY, uiXLocation);
+            previousY += HelperFunctions.VerticalScrollValueOf(panel);
         }
 
 

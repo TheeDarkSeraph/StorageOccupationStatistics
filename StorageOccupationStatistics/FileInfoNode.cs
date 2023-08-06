@@ -47,6 +47,10 @@ namespace StorageOccupationStatistics {
             }
             CalculateSize();
         }
+
+        public FileNodeUi UiNode() {
+            return _nodeUi;
+        }
         public string GetFileName()
         {
             string name = _nodeFile.Name;
@@ -157,24 +161,21 @@ namespace StorageOccupationStatistics {
 
 
         public float GetSizeRatio() {
-            if (ParentNode == null){
-                string rootPath = Path.GetPathRoot(GetFilePath());
-                if (rootPath != null) {
-                    long freeSpace = GetTotalFreeSpace(rootPath);
-                    long totalSpace = GetTotalSpace(rootPath);
-                    long takenSpace = totalSpace - freeSpace;
-                    if (rootPath == GetFilePath()) {
-                        return (float)(takenSpace / ((double)totalSpace));
-                    } else {
-                        return (float)(GetFileSize() / (double)takenSpace);
-                    }
-                } else {
-                    return 1;
-                }
-            } else {
-                long parentSize = Math.Max(ParentNode.GetFileSize(), 1);
-                return (float)(GetFileSize() / ((double)parentSize));
-            }
+            if (ParentNode == null) {
+                string? rootPath = Path.GetPathRoot(GetFilePath());
+                return rootPath != null ? RootDirectorySpaceRatio(rootPath) : 1;
+            } 
+            long parentSize = Math.Max(ParentNode.GetFileSize(), 1);
+            return (float)(GetFileSize() / ((double)parentSize));
+        }
+
+        private float RootDirectorySpaceRatio(string rootPath) {
+            long freeSpace = GetTotalFreeSpace(rootPath);
+            long totalSpace = GetTotalSpace(rootPath);
+            long takenSpace = totalSpace - freeSpace;
+            if (rootPath == GetFilePath()) 
+                return (float)(takenSpace / ((double)totalSpace));
+            return (float)(GetFileSize() / (double)takenSpace);
         }
 
         public long GetFileSize() {
